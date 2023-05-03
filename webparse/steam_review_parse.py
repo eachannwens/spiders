@@ -43,9 +43,8 @@ def steam_helper(selector: Selector, filename):
             played_hour = 0
 
         # Date & Text
-        date_info = card.xpath('.//div[@class="date_posted"]/text()').get().split(' ')
-        date_month = date_info[1]
-        date_day = date_info[2]
+        date_info = card.xpath('.//div[@class="date_posted"]/text()').get()
+        date = date_info
         review = card.xpath('.//div[@class="apphub_CardTextContent"]/text()').getall()
         review = ''.join(review).strip()
 
@@ -86,8 +85,7 @@ def steam_helper(selector: Selector, filename):
             'funny': funny,
             'appraise': appraise,
             'played_hour': played_hour,
-            'post_month': date_month,
-            'post_day': date_day,
+            'post_date': date,
             'games': games,
             'reply': reply,
             'image': image,

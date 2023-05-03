@@ -1,0 +1,118 @@
+---
+title: "DataPreprocess"
+author: "WenYuanchun"
+date: "2023-04-27"
+output: html_document
+---
+
+```{r}
+csvpaths <- file.path('..', 'csvoutput')
+filenames <- list.files(csvpaths)
+print(c('Number of games:', length(filenames)))
+print(filenames)
+```
+
+```{r}
+df = NULL
+for (filename in filenames) {
+  # load game name
+  gamename <- strsplit(filename, split = '.', fixed = TRUE)[[1]][1]
+  # load DF
+  csvdata <- read.csv(file = file.path(csvpaths, filename), row.names = 1)
+  # add game name into DF
+  csvdata$name_of_game <- gamename
+  # bind vertical
+  df <- rbind(df, csvdata)
+}
+rm(gamename, csvdata, filename)
+# str(df)
+```
+
+Package Installation
+
+```{r}
+# install.packages(c('SentimentAnalysis', 'quanteda', 'devtools', 'syuzhet'))
+# remotes::install_github("r-lib/rlang")
+```
+
+1.  Text Quality Analysis
+
+`quanteda` -> word count, sentence length, readability score, lexical diversity, etc.
+
+`skimr` -> missing values, outliers, duplicates, etc.
+
+```{r}
+library(quanteda)
+
+filter_meaningless_word <- function(x) {
+  x <- tokens(x, remove_symbols = TRUE)
+  x <- paste(as.character(x), collapse = " ")
+}
+df$review <- sapply(df$review, filter_meaningless_word)
+```
+
+```{r}
+library(SentimentAnalysis)
+
+count_meaningful_word <- function(x) {
+  x <- as.integer(countWords(x))
+}
+df$review_word_count <- sapply(df$review, count_meaningful_word)
+# Drop non-content record
+df <- subset(df, review_word_count > 5)
+```
+
+2.  Manage data type
+
+```{r}
+chr2int <- function(x) {
+  x <- gsub('[^0-9.]', '', x)
+  x <- as.numeric(x)
+}
+df$helpful <- sapply(df$helpful, chr2int)
+df$funny <- sapply(df$funny, chr2int)
+df$played_hour <- sapply(df$played_hour, chr2int)
+df$post_day <- sapply(df$post_day, chr2int)
+df$games <- sapply(df$games, chr2int)
+# Replace NA by 0
+df <- replace(df, is.na(df), 0)
+```
+
+Save data frame
+
+```{r}
+write.csv(df, file = 'df.csv', row.names = FALSE)
+```
+
+Load data frame
+
+```{r}
+df <- read.csv(file = 'df.csv', header = TRUE)
+```
+
+```{r}
+model <- lm(helpful ~ review_word_count + games + reply + image, data = df)
+summary(model)
+```
+
+
+3.  Sentiment Analysis
+
+`nrc`: This is a dictionary that assigns a polarity of either positive or negative and an emotion of either anger, anticipation, disgust, fear, joy, sadness, surprise, or trust to each word based on how it expresses these sentiments. The nrc dictionary assigns a polarity of either positive or negative and an emotion of either anger, anticipation, disgust, fear, joy, sadness, surprise, or trust to each word based on how it expresses these sentiments. It has 13922 words in total and covers a wide range of topics and domains.
+
+`qdap`: This is a dictionary that assigns a polarity score between -4 and 4 to each word based on how positive or negative it is. This dictionary assigns a polarity score between -4 and 4 to each word based on how positive or negative it is. It has 6782 words in total and covers a wide range of topics and domains. It also takes into account some valence shifters, such as negators, amplifiers, deamplifiers, etc. that can modify the polarity of the words.
+
+```{r}
+# Useless
+# library(syuzhet)
+# get_nrc_sentiment(as.character(meaningful_words))
+```
+
+```{r}
+# library(SentimentAnalysis)
+# text <- "I love this game. It is so fun and exciting."
+# result <- analyzeSentiment(text)
+# print(result)
+```
+
+

@@ -1,0 +1,37 @@
+---
+title: "DataAnaylysis"
+author: "WenYuanchun"
+date: "2023-05-03"
+output: html_document
+---
+
+```{r}
+df <- read.csv(file = 'df.csv', header = TRUE)
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(data = df, mapping = aes(x = helpful)) + geom_histogram()
+```
+
+```{r}
+take_log <- function(x) {
+  # To avoid negative infinity
+  # add one
+  x <- round(log(x + 1), digits = 0)
+}
+df$helpful_log <- sapply(df$helpful, take_log)
+```
+
+```{r}
+ggplot(data = df, mapping = aes(x = helpful_log)) + geom_histogram(bins = 30, boundary = 0)
+```
+
+
+
+```{r}
+model <- lm(helpful_log ~ appraise + review_word_count + games + reply + image + played_hour, data = df)
+summary(model)
+```
+
