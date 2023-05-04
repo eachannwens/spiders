@@ -4,10 +4,9 @@ import pandas as pd
 from scrapy.selector import Selector
 
 
-def steam_helper(selector: Selector, filename):
+def steam_helper(selector: Selector, filename, total_page):
 
-    df = pd.DataFrame(columns=['author', 'home_url', 'helpful', 'funny', 'appraise', 'played_hour',
-                               'post_month', 'post_day', 'games', 'reply', 'image', 'review'])
+    df = None
 
     app_cards = selector.xpath(
         '//div[contains(@class, "apphub_Card") and '
@@ -16,6 +15,9 @@ def steam_helper(selector: Selector, filename):
     )  # Match at least one
 
     print(f'\nLog: number of reviews: {len(app_cards)}\n')
+
+    card_num_of_page = int(len(app_cards) / total_page)
+    card_index = 1
 
     for card in app_cards:
 
@@ -60,7 +62,9 @@ def steam_helper(selector: Selector, filename):
 
         # Head image
         image = card.xpath('.//div[contains(@class, "appHubIconHolder")]/img').xpath('@src').extract_first()
+        image_link = image
         image = 1 if image != 'https://avatars.cloudflare.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb.jpg' else 0
+        # https://avatars.akamai.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb.jpg
 
         # Personal home link
         home_link = card.xpath('.//div[@class="apphub_friend_block_container"]/a').xpath('@href').extract_first()
@@ -79,6 +83,7 @@ def steam_helper(selector: Selector, filename):
 
         # Load into Dataframe
         df = pd.concat([df, pd.DataFrame({
+            'page_index': int(card_index / card_num_of_page) + 1,
             'author': author,
             'home_url': home_link,
             'helpful': helpful,
@@ -89,14 +94,17 @@ def steam_helper(selector: Selector, filename):
             'games': games,
             'reply': reply,
             'image': image,
-            'review': review
+            'image_link': image_link,
+            'review': review,
         }, index=[0])], ignore_index=True)
+
+        card_index += 1
 
     # Finished
     print(df)
 
     # Save to disk
-    df.to_csv(os.path.join('../csvoutput', filename), index=True)
-    print('Save to', os.path.join('../csvoutput', filename))
+    df.to_csv(os.path.join('../testoutput', filename), index=True)
+    print('Save to', os.path.join('../testoutput', filename))
 
 

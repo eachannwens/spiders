@@ -5,33 +5,108 @@ date: "2023-05-03"
 output: html_document
 ---
 
+# Load preprocessed dataset
+
 ```{r}
-df <- read.csv(file = 'df.csv', header = TRUE)
+df <- read.csv(file = 'df3.csv', header = TRUE)
+df$image <- as.factor(df$image)
+df$name_of_game <- as.factor(df$name_of_game)
+```
+
+```{r}
+summary(df)
+summary(df$name_of_game)
+```
+
+```{r}
+library(dplyr)
+
+df_browsing_coefficient <- df %>%
+  group_by(name_of_game) %>%
+  mutate(browsing_coefficient = -(log(page_index*0.5-0.45)) + (log(max(page_index*0.5-0.45)) + 1))
+df_browsing_coefficient <- df_browsing_coefficient %>%
+  mutate(helpful_browsing_coefficient = helpful / browsing_coefficient)
+```
+
+```{r}
+df_browsing_coefficient$helpful_category <- cut(df_browsing_coefficient$helpful, breaks = c(-1, 0, 1, 2, 5, 30, 100, 500, Inf), labels = c("0 Useful", "1 Useful", "2 Useful", "3-5 Useful", "6-30 Useful", "31-100 Useful", "101-500 Useful", "501+ Useful"))
+summary(df_browsing_coefficient$helpful_category)
+df_browsing_coefficient$helpful_category <- cut(df_browsing_coefficient$helpful_browsing_coefficient, breaks = c(-1, 0, 1, 2, 5, 30, 100, 500, Inf), labels = c("0 Useful", "1 Useful", "2 Useful", "3-5 Useful", "6-30 Useful", "31-100 Useful", "101-500 Useful", "501+ Useful"))
+summary(df_browsing_coefficient$helpful_category)
+```
+
+# Usability checking
+
+Main assumptions of multiple linear regression:
+
+1.  **Linear Relationship**: There exists a linear relationship between each predictor variable and the response variable
+2.  **No Multicollinearity**: None of the predictor variables are highly correlated with each other
+3.  **Independence**: The observations are independent and randomly sampled from the population
+4.  **Homoscedasticity**: The residuals have constant variance at every point in the linear model
+5.  **Multivariate normality**: The residuals of the model are normally distributed
+
+## Kolmogorov-Smirnov Test
+
+```{r}
+# install.packages("dgof")
+library("dgof")
+
+# Shapiro-Wilk sample size between 3 and 5000
+# shapiro.test(df$helpful)
+
+# Kolmogorov-Smirnov sample size larger than 5000
+ks.test(df_browsing_coefficient$helpful_browsing_coefficient, "pnorm")
 ```
 
 ```{r}
 library(ggplot2)
-
-ggplot(data = df, mapping = aes(x = helpful)) + geom_histogram()
+summary(df_browsing_coefficient$helpful_browsing_coefficient)
+ggplot(data = df_browsing_coefficient, mapping = aes(x = helpful_browsing_coefficient)) + geom_histogram(boundary = 0)
 ```
 
 ```{r}
 take_log <- function(x) {
   # To avoid negative infinity
   # add one
-  x <- round(log(x + 1), digits = 0)
+  x <- round(log(x + 1), digits = 4)
 }
-df$helpful_log <- sapply(df$helpful, take_log)
+df_browsing_coefficient$helpful_log <- sapply(df_browsing_coefficient$helpful_browsing_coefficient, take_log)
 ```
 
 ```{r}
-ggplot(data = df, mapping = aes(x = helpful_log)) + geom_histogram(bins = 30, boundary = 0)
+ggplot(data = df_browsing_coefficient, mapping = aes(x = helpful_log)) + geom_histogram(boundary = 0)
 ```
 
-
-
 ```{r}
-model <- lm(helpful_log ~ appraise + review_word_count + games + reply + image + played_hour, data = df)
+# install.packages('car')
+# install.packages('MVN')
+library(car)
+library(MVN)
+library(dplyr)
+
+# Random sample
+# set.seed(123)
+# sample_df <- sample_n(df, 1000)
+
+# Build model
+model <- lm(helpful_log ~ appraise + review_word_count + games + reply + played_hour + image, data = df_browsing_coefficient)
+
+# Then, we can see the result
 summary(model)
-```
 
+# VIF Multicollinearity test
+vif(mod = model)
+
+# Breusch-Pagan test: to check homoscedasticity
+ncvTest(model)
+# - plot Q-Q plot of residuals
+qqnorm(model$residuals)
+qqline(model$residuals)
+# - plot density plot of residuals
+plot(density(model$residuals), main = "Density plot of residuals")
+# - scatter plot of residuals
+plot(model$fitted.values, model$residuals, xlab = "Fitted values", ylab = "Residuals")
+
+# Multivariate normality test
+# mvn(model$residuals, mvnTest = "mardia")
+```

@@ -6,32 +6,63 @@ output: html_document
 ---
 
 ```{r}
-csvpaths <- file.path('..', 'csvoutput')
+csvpaths <- file.path('..', 'testoutput')
 filenames <- list.files(csvpaths)
 print(c('Number of games:', length(filenames)))
 print(filenames)
 ```
 
 ```{r}
-df = NULL
+library(quanteda)
+library(SentimentAnalysis)
+library(pbapply)
+
+count_meaningful_word <- function(x) {
+  x <- as.integer(countWords(x))
+}
+
+filter_meaningless_word <- function(x) {
+  x <- tokens(x, remove_symbols = TRUE)
+  x <- paste(as.character(x), collapse = " ")
+}
+
+chr2int <- function(x) {
+  x <- gsub('[^0-9.]', '', x)
+  x <- as.numeric(x)
+}
+
+df <- NULL
 for (filename in filenames) {
+  print(filename)
   # load game name
   gamename <- strsplit(filename, split = '.', fixed = TRUE)[[1]][1]
   # load DF
   csvdata <- read.csv(file = file.path(csvpaths, filename), row.names = 1)
   # add game name into DF
   csvdata$name_of_game <- gamename
+  # Text Quality Analysis
+  csvdata$review <- pbsapply(csvdata$review, filter_meaningless_word)
+  # Count Useful Words
+  csvdata$review_word_count <- pbsapply(csvdata$review, count_meaningful_word)
+  # Drop non-content record
+  csvdata <- subset(csvdata, review_word_count > 5)
+  # Manage data type
+  csvdata$helpful <- sapply(csvdata$helpful, chr2int)
+  csvdata$funny <- sapply(csvdata$funny, chr2int)
+  csvdata$played_hour <- sapply(csvdata$played_hour, chr2int)
+  csvdata$games <- sapply(csvdata$games, chr2int)
+  # Replace NA by 0
+  csvdata <- replace(csvdata, is.na(csvdata), 0)
   # bind vertical
   df <- rbind(df, csvdata)
+  rm(gamename, csvdata, filename)
 }
-rm(gamename, csvdata, filename)
-# str(df)
 ```
 
 Package Installation
 
 ```{r}
-# install.packages(c('SentimentAnalysis', 'quanteda', 'devtools', 'syuzhet'))
+# install.packages(c('SentimentAnalysis', 'quanteda', 'devtools', 'syuzhet', 'pbapply'))
 # remotes::install_github("r-lib/rlang")
 ```
 
@@ -41,60 +72,13 @@ Package Installation
 
 `skimr` -> missing values, outliers, duplicates, etc.
 
-```{r}
-library(quanteda)
-
-filter_meaningless_word <- function(x) {
-  x <- tokens(x, remove_symbols = TRUE)
-  x <- paste(as.character(x), collapse = " ")
-}
-df$review <- sapply(df$review, filter_meaningless_word)
-```
-
-```{r}
-library(SentimentAnalysis)
-
-count_meaningful_word <- function(x) {
-  x <- as.integer(countWords(x))
-}
-df$review_word_count <- sapply(df$review, count_meaningful_word)
-# Drop non-content record
-df <- subset(df, review_word_count > 5)
-```
-
 2.  Manage data type
-
-```{r}
-chr2int <- function(x) {
-  x <- gsub('[^0-9.]', '', x)
-  x <- as.numeric(x)
-}
-df$helpful <- sapply(df$helpful, chr2int)
-df$funny <- sapply(df$funny, chr2int)
-df$played_hour <- sapply(df$played_hour, chr2int)
-df$post_day <- sapply(df$post_day, chr2int)
-df$games <- sapply(df$games, chr2int)
-# Replace NA by 0
-df <- replace(df, is.na(df), 0)
-```
 
 Save data frame
 
 ```{r}
-write.csv(df, file = 'df.csv', row.names = FALSE)
+write.csv(df, file = 'df3.csv', row.names = FALSE)
 ```
-
-Load data frame
-
-```{r}
-df <- read.csv(file = 'df.csv', header = TRUE)
-```
-
-```{r}
-model <- lm(helpful ~ review_word_count + games + reply + image, data = df)
-summary(model)
-```
-
 
 3.  Sentiment Analysis
 
